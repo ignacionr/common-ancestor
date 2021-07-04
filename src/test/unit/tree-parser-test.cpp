@@ -5,8 +5,6 @@ TEST(tree_parser, no_text) {
   int times{};
   tree_parser::parse("", [&times](auto){ ++times;});
   EXPECT_EQ(times, 0);
-  // EXPECT_STRNE("hello", "world");
-  // EXPECT_EQ(7 * 6, 42);
 }
 
 TEST(tree_parser, invalid_text) {
