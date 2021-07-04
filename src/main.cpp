@@ -16,7 +16,7 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
       }
       else if (mg_http_match_uri(hm, "/tree")) {
         auto tree_id = data.insert_tree({hm->body.ptr, hm->body.len});
-        mg_http_reply(c, 200, nullptr, std::to_string(tree_id).c_str());
+        mg_http_reply(c, 200, nullptr, tree_id.c_str());
       }
       else {
         mg_http_reply(c, 404, nullptr, "Not found");

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(common-ancestor VERSION 0.1)
+project(common-ancestor VERSION 0.2)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -17,12 +17,6 @@ FetchContent_Declare(mongoose
 )
 
 FetchContent_Populate(mongoose)
-
-# FetchContent_Declare(sqllite
-#   GIT_REPOSITORY https://github.com/sqlite/sqlite.git
-# )
-
-# FetchContent_MakeAvailable(sqllite)
 
 add_executable(common-ancestor 
   main.cpp data-adapter.h tree.h tree-parser.h

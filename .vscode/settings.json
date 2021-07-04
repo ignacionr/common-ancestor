@@ -54,7 +54,16 @@
     "streambuf": "cpp",
     "thread": "cpp",
     "cinttypes": "cpp",
-    "typeinfo": "cpp"
+    "typeinfo": "cpp",
+    "any": "cpp",
+    "cstring": "cpp",
+    "forward_list": "cpp",
+    "map": "cpp",
+    "set": "cpp",
+    "unordered_set": "cpp",
+    "netfwd": "cpp",
+    "iomanip": "cpp",
+    "variant": "cpp"
   },
   "editor.tokenColorCustomizations": {
     "textMateRules": [
@@ -86,6 +95,12 @@
       "driver": "SQLite",
       "database": "/home/ignacio/src/ignacionr/common-ancestor/build/trees.db",
       "name": "trees"
+    },
+    {
+      "previewLimit": 50,
+      "driver": "SQLite",
+      "database": "/home/ignacio/src/ignacionr/common-ancestor/build/trees-0.1.db",
+      "name": "t-01"
     }
   ],
   "gtest-adapter.supportLocation": true,

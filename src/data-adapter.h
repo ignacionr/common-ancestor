@@ -4,6 +4,8 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <string>
+
 #include "version.h"
 #if !defined(VERSION)
 #define VERSION "please run CMake"
@@ -38,7 +40,7 @@ public:
           "FOREIGN KEY(node_tree) REFERENCES tree(id)",
           "FOREIGN KEY(left) REFERENCES node(id)",
           "FOREIGN KEY(right) REFERENCES node(id)",
-          "UNIQUE (value, node_tree)"
+          "UNIQUE (node_tree,value)"
       });
       upsert("config", "item", "content", "version", VERSION);
     }
@@ -49,16 +51,48 @@ public:
       sqlite3_close(db);
   }
 
-  int insert_tree(std::string_view text) 
+  std::string ensure_node(std::string const &tree_id, int const value) const
   {
-    // [5<10>15][5>7][13<15][11<13>14]
-    std::cerr << __FILE__ << ":" << __LINE__ << " body:" << text << std::endl;
-
-    throw std::runtime_error("not implemented");
-    return 0;
+    auto const valueStr {std::to_string(value)};
+    std::string res;
+    exec(std::string("INSERT INTO node (value, node_tree) VALUES(") + valueStr + "," + tree_id + ") "
+      "ON CONFLICT(node_tree,value) DO NOTHING; SELECT id FROM node WHERE node_tree=" + tree_id + " AND value=" + valueStr,
+      [&res](auto values, auto columns) {
+        res = values.front();
+      });
+    return res;
   }
 
-  std::string version() 
+  std::string insert_tree(std::string_view text) const
+  {
+    std::string tree_id;
+    exec("INSERT INTO tree DEFAULT VALUES; SELECT last_insert_rowid()", [&tree_id](auto values, auto columns){
+      tree_id = values.front();
+    });
+    if (tree_id.empty()) {
+      throw std::runtime_error("couldn't obtain last tree id");
+    }
+    tree_parser::parse(text, [this, &tree_id](auto node){
+      auto this_node = ensure_node(tree_id, node.value);
+      std::string additional;
+      if (node.left.has_value()) {
+        auto left = ensure_node(tree_id, node.left.value());
+        additional = " left = " + left;
+      }
+      if (node.right.has_value()) {
+        auto right = ensure_node(tree_id, node.right.value());
+        if (!additional.empty()) additional += ',';
+        additional += " right = " + right;
+      }
+      if (!additional.empty()) {
+        std::string const cmd {"UPDATE node SET " + additional + " WHERE id=" + this_node};
+        exec(cmd);
+      }
+    });
+    return tree_id;
+  }
+
+  std::string version() const
   {
     std::string result;
     try {
@@ -86,7 +120,7 @@ public:
   }
 
   template<typename T>
-  void create_table(std::string_view name, T fields, bool if_not_exists = false) {
+  void create_table(std::string_view name, T fields, bool if_not_exists = false) const {
     std::string cmd("CREATE TABLE ");
     if (if_not_exists) cmd += "IF NOT EXISTS ";
     cmd += name;
@@ -103,7 +137,7 @@ public:
     exec(cmd);
   }
 
-  void drop_table(std::string_view name, bool if_exists) {
+  void drop_table(std::string_view name, bool if_exists) const {
     std::string cmd("DROP TABLE ");
     if (if_exists) cmd += "IF EXISTS ";
     cmd += name;
@@ -114,7 +148,7 @@ public:
     std::string_view key_column, 
     std::string_view value_column,
     std::string_view key, 
-    std::string_view new_value) 
+    std::string_view new_value) const
   {
     std::string cmd("INSERT INTO ");
     cmd += table;
@@ -135,7 +169,7 @@ public:
     exec(cmd);
   }
 
-  void exec(std::string_view command)
+  void exec(std::string_view command) const
   {
     char *pError;
     auto rc = sqlite3_exec(db,
@@ -156,23 +190,25 @@ public:
   }
 
   template <typename T>
-  void exec(std::string_view command, T callback)
+  void exec(std::string_view command, T callback) const
   {
     std::cerr << command << std::endl;
     char *pError;
     auto rc = sqlite3_exec(
         db,
         std::string(command).c_str(),
-        +[](void *pActualCallback, int col_count, char **paValues, char **paColumnNames)
+        +[](void *cb, int col_count, char **paValues, char **paColumnNames)
         {
+          std::cerr << "\nresults row" << std::endl;
           auto values = std::vector<std::string_view>(col_count);
           auto columns = std::vector<std::string_view>(col_count);
           for (int col{0}; col < col_count; ++col)
           {
+            std::cerr << paColumnNames[col] << "=" << paValues[col] << std::endl;
             values[col] = paValues[col];
             columns[col] = paColumnNames[col];
           }
-          (*static_cast<T *>(pActualCallback))(values, columns);
+          (*static_cast<T *>(cb))(values, columns);
           return 0;
         },
         &callback,
@@ -187,8 +223,6 @@ public:
       sqlite3_free(pError);
   }
 
-
-  
 
 private:
   sqlite3 *db{};
