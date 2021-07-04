@@ -8,43 +8,70 @@
 #if !defined(VERSION)
 #define VERSION "please run CMake"
 #endif
+#include "tree-parser.h"
 
 class data_adapter
 {
 public:
   data_adapter()
   {
-    auto rc{sqlite3_open("trees.db", &db)};
+    auto rc{sqlite3_open("trees-" VERSION ".db", &db)};
     if (rc != SQLITE_OK)
     {
       throw std::runtime_error("unable to open the database");
     }
     if (version() != VERSION) {
-      drop_table("node");
-      drop_table("tree");
-      drop_table("config");
+      drop_table("config", true);
+      drop_table("node", true);
+      drop_table("tree", true);
 
       create_table("config", std::array<std::string_view,2>{
         "item TEXT PRIMARY KEY",
         "content TEXT" });
       create_table("tree", std::array<std::string_view, 1>{"id INTEGER PRIMARY KEY"});
-      create_table("node", std::array<std::string_view, 4>{
+      create_table("node", std::array<std::string_view, 9>{
           "id INTEGER PRIMARY KEY",
           "value INTEGER",
+          "left INTEGER NULL",
+          "right INTEGER NULL",
           "node_tree INTEGER",
-          "FOREIGN KEY(node_tree) REFERENCES tree(id)"
+          "FOREIGN KEY(node_tree) REFERENCES tree(id)",
+          "FOREIGN KEY(left) REFERENCES node(id)",
+          "FOREIGN KEY(right) REFERENCES node(id)",
+          "UNIQUE (value, node_tree)"
       });
       upsert("config", "item", "content", "version", VERSION);
     }
   }
+  ~data_adapter()
+  {
+    if (db)
+      sqlite3_close(db);
+  }
 
-  std::string version() {
+  int insert_tree(std::string_view text) 
+  {
+    // [5<10>15][5>7][13<15][11<13>14]
+    std::cerr << __FILE__ << ":" << __LINE__ << " body:" << text << std::endl;
+
+    throw std::runtime_error("not implemented");
+    return 0;
+  }
+
+  std::string version() 
+  {
     std::string result;
-    exec("SELECT content FROM config WHERE item='version'", [&result](auto values, auto columns) { result = values[0]; });
+    try {
+      exec("SELECT content FROM config WHERE item='version'", [&result](auto values, auto columns) { result = values[0]; });
+    }
+    catch(std::exception const &) {
+      result = "unknown";
+    }
     return result;
   }
 
-  static std::string quoted(std::string_view text) {
+  static std::string quoted(std::string_view text) 
+  {
     std::string result;
     result.reserve(text.size() + 2);
     result.append("'");
@@ -76,8 +103,9 @@ public:
     exec(cmd);
   }
 
-  void drop_table(std::string_view name) {
+  void drop_table(std::string_view name, bool if_exists) {
     std::string cmd("DROP TABLE ");
+    if (if_exists) cmd += "IF EXISTS ";
     cmd += name;
     exec(cmd);
   }
@@ -159,11 +187,8 @@ public:
       sqlite3_free(pError);
   }
 
-  ~data_adapter()
-  {
-    if (db)
-      sqlite3_close(db);
-  }
+
+  
 
 private:
   sqlite3 *db{};

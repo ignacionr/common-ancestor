@@ -9,15 +9,21 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
   static data_adapter data;
   if (ev == MG_EV_HTTP_MSG)
   {
+    try {
     auto hm{(struct mg_http_message *)ev_data};
-    if (mg_http_match_uri(hm, "/version")) {
-      mg_http_reply(c, 200, nullptr, data.version().c_str());
+      if (mg_http_match_uri(hm, "/version")) {
+        mg_http_reply(c, 200, nullptr, data.version().c_str());
+      }
+      else if (mg_http_match_uri(hm, "/tree")) {
+        auto tree_id = data.insert_tree({hm->body.ptr, hm->body.len});
+        mg_http_reply(c, 200, nullptr, std::to_string(tree_id).c_str());
+      }
+      else {
+        mg_http_reply(c, 404, nullptr, "Not found");
+      }
     }
-    if (mg_http_match_uri(hm, "/test")) {
-      mg_http_reply(c, 200, nullptr, "OK");
-    }
-    else {
-      mg_http_reply(c, 404, nullptr, "Not found");
+    catch(std::exception const &e) {
+      mg_http_reply(c, 500, nullptr, e.what());
     }
   }
 }

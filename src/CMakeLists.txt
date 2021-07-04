@@ -25,7 +25,7 @@ FetchContent_Populate(mongoose)
 # FetchContent_MakeAvailable(sqllite)
 
 add_executable(common-ancestor 
-  main.cpp data-adapter.h
+  main.cpp data-adapter.h tree.h tree-parser.h
   ${mongoose_SOURCE_DIR}/mongoose.c 
 )
 
@@ -43,7 +43,7 @@ enable_testing()
 
 add_executable(
   test-common-ancestor
-  test/unit/test.cpp
+  test/unit/tree-parser-test.cpp
 )
 
 target_link_libraries(

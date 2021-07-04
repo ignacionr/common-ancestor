@@ -87,5 +87,9 @@
       "database": "/home/ignacio/src/ignacionr/common-ancestor/build/trees.db",
       "name": "trees"
     }
+  ],
+  "gtest-adapter.supportLocation": true,
+  "cSpell.words": [
+    "strne"
   ]
 }
