@@ -1,0 +1,2 @@
+// the configured options and settings for Tutorial
+#define VERSION "@common-ancestor_VERSION_MAJOR@.@common-ancestor_VERSION_MINOR@"

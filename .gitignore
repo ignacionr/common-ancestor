@@ -1,0 +1,4 @@
+**/*.o
+**/common-ancestor
+**/build
+build
