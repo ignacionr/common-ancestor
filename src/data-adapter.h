@@ -5,6 +5,7 @@
 #include <array>
 #include <iostream>
 #include <string>
+#include <set>
 
 #include "version.h"
 #if !defined(VERSION)
@@ -51,16 +52,18 @@ public:
       sqlite3_close(db);
   }
 
-  std::string ensure_node(std::string const &tree_id, int const value) const
+  int find_common_ancestor(std::string_view tree_id, int v1, int v2) const
   {
-    auto const valueStr {std::to_string(value)};
-    std::string res;
-    exec(std::string("INSERT INTO node (value, node_tree) VALUES(") + valueStr + "," + tree_id + ") "
-      "ON CONFLICT(node_tree,value) DO NOTHING; SELECT id FROM node WHERE node_tree=" + tree_id + " AND value=" + valueStr,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    return res;
+    std::set<std::string> ancestors;
+    for (auto ancestor1 = get_id_by_value(tree_id, v1); !ancestor1.empty(); ancestor1 = get_parent_by_id(ancestor1)) { 
+      ancestors.emplace(ancestor1);
+    }
+    for (auto ancestor2 {get_id_by_value(tree_id, v2)}; !ancestor2.empty(); ancestor2 = get_parent_by_id(ancestor2)) { 
+      if (ancestors.find(ancestor2) != ancestors.end()) {
+        return get_value_by_id(ancestor2);
+      }
+    }
+    throw std::runtime_error("No common ancestor.");
   }
 
   std::string insert_tree(std::string_view text) const
@@ -103,6 +106,8 @@ public:
     }
     return result;
   }
+
+private:
 
   static std::string quoted(std::string_view text) 
   {
@@ -192,19 +197,19 @@ public:
   template <typename T>
   void exec(std::string_view command, T callback) const
   {
-    std::cerr << command << std::endl;
+    // std::cerr << command << std::endl;
     char *pError;
     auto rc = sqlite3_exec(
         db,
         std::string(command).c_str(),
         +[](void *cb, int col_count, char **paValues, char **paColumnNames)
         {
-          std::cerr << "\nresults row" << std::endl;
+          // std::cerr << "\nresults row" << std::endl;
           auto values = std::vector<std::string_view>(col_count);
           auto columns = std::vector<std::string_view>(col_count);
           for (int col{0}; col < col_count; ++col)
           {
-            std::cerr << paColumnNames[col] << "=" << paValues[col] << std::endl;
+            // std::cerr << paColumnNames[col] << "=" << paValues[col] << std::endl;
             values[col] = paValues[col];
             columns[col] = paColumnNames[col];
           }
@@ -223,7 +228,73 @@ public:
       sqlite3_free(pError);
   }
 
+  std::string ensure_node(std::string_view tree_id, int const value) const
+  {
+    auto const valueStr {std::to_string(value)};
+    std::string res;
+    auto cmd = std::string("INSERT INTO node (value, node_tree) VALUES(") + valueStr + ",";
+    cmd += tree_id;
+    cmd += ") "
+      "ON CONFLICT(node_tree,value) DO NOTHING; SELECT id FROM node WHERE node_tree=";
+    cmd += tree_id;
+    cmd += " AND value=" + valueStr;
+    exec( cmd,
+      [&res](auto values, auto columns) {
+        res = values.front();
+      });
+    return res;
+  }
 
-private:
+  std::string get_parent_by_id(std::string_view node_id) const 
+  {
+    auto cmd = std::string("SELECT id FROM node WHERE ");
+    cmd += " left=";
+    cmd += node_id;
+    cmd += " OR right=";
+    cmd += node_id;
+
+    std::string res;
+    exec( cmd,
+      [&res](auto values, auto columns) {
+        res = values.front();
+      });
+    return res;
+  }
+
+  std::string get_id_by_value(std::string_view tree_id, int const value) const
+  {
+    auto const valueStr {std::to_string(value)};
+    auto cmd = std::string("SELECT id FROM node WHERE node_tree = ");
+    cmd += tree_id;
+    cmd += " AND value=";
+    cmd += std::to_string(value);
+    std::string res;
+    exec( cmd,
+      [&res](auto values, auto columns) {
+        res = values.front();
+      });
+    if (res.empty()) {
+      throw std::runtime_error("Not found.");
+    }
+    return res;
+  }
+
+  int get_value_by_id(std::string_view node_id) const
+  {
+    auto cmd = std::string("SELECT value FROM node WHERE id = ");
+    cmd += node_id;
+    int res;
+    bool found{};
+    exec( cmd,
+      [&res, &found](auto values, auto columns) {
+        res = std::atoi(std::string(values.front()).c_str());
+        found = true;
+      });
+    if (!found) {
+      throw std::runtime_error("Not found.");
+    }
+    return res;
+  }
+
   sqlite3 *db{};
 };
