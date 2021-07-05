@@ -222,6 +222,7 @@ private:
     {
       std::string descr(pError);
       sqlite3_free(pError);
+      std::cerr << descr << std::endl;
       throw std::runtime_error(descr);
     }
     if (pError)
