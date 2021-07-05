@@ -20,7 +20,7 @@ bg: build/common-ancestor
 kill: 
 	pkill common-ancestor
 
-test-integration: bg post-tree.pass kill
+test-integration: bg post-tree.pass retrieve-common-ancestor.pass kill
 
 %.pass: src/test/integration/%.sh
 	$<

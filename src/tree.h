@@ -1,88 +1,75 @@
 #pragma once
-#include <string>
-#include <string_view>
+#include "tree-parser.h"
 
-template<typename TData>
-class tree {
+template <typename TTreeKey>
+class tree
+{
 public:
-  tree(TData *data, std::string_view tree_id): data_{data}, tree_id_{tree_id} {}
-  template<typename TCallback>
-  void visit_ancestors(int value, TCallback cb) 
+  tree(TTreeKey tree_id) : tree_id_{tree_id} {}
+
+  TTreeKey id() const { return tree_id_; }
+
+  static tree parse(auto &repo, std::string_view text)
   {
-    for (auto ancestor = get_id_by_value(value); !ancestor.empty(); ancestor = get_parent_by_id(ancestor)) { 
-      if (!cb(ancestor)) break;
+    tree t{repo.new_tree()};
+    tree_parser::parse(text, [&repo, &t](auto node)
+                       {
+                         t.add_node(repo, node);
+                       });
+    return t;
+  }
+
+  void visit_ancestors(auto &repo, int value, auto cb) const
+  {
+    for (auto ancestor = repo.get_id_by_value(tree_id_, value); !ancestor.empty(); ancestor = repo.get_parent_by_id(ancestor))
+    {
+      if (!cb(ancestor))
+        break;
     }
   }
 
-  std::string get_id_by_value(int const value) const
+  void add_node(auto &repo, auto node)
   {
-    auto const valueStr {std::to_string(value)};
-    auto cmd = std::string("SELECT id FROM node WHERE node_tree = ");
-    cmd += tree_id_;
-    cmd += " AND value=";
-    cmd += std::to_string(value);
-    std::string res;
-    data_->exec( cmd,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    if (res.empty()) {
-      throw std::runtime_error("Not found.");
+    auto this_node = repo.ensure_node(tree_id_, node.value);
+    if (node.left.has_value())
+    {
+      auto left = repo.ensure_node(tree_id_, node.left.value());
+      repo.bind_left(this_node, left);
     }
-    return res;
+    if (node.right.has_value())
+    {
+      auto right = repo.ensure_node(tree_id_, node.right.value());
+      repo.bind_right(this_node, right);
+    }
   }
 
-  int get_value_by_id(std::string_view node_id) const
+  template <typename TRepo>
+  int find_common_ancestor(TRepo &repo, int v1, int v2) const
   {
-    auto cmd = std::string("SELECT value FROM node WHERE id = ");
-    cmd += node_id;
-    int res;
+    std::set<typename TRepo::node_key_t> ancestors;
+    visit_ancestors(repo, v1,
+                    [&ancestors](auto id)
+                    {
+                      ancestors.emplace(id);
+                      return true;
+                    });
     bool found{};
-    data_->exec( cmd,
-      [&res, &found](auto values, auto columns) {
-        res = std::atoi(std::string(values.front()).c_str());
-        found = true;
-      });
-    if (!found) {
-      throw std::runtime_error("Not found.");
-    }
-    return res;
-  }
-
-  std::string get_parent_by_id(std::string_view node_id) const 
-  {
-    auto cmd = std::string("SELECT id FROM node WHERE ");
-    cmd += " left=";
-    cmd += node_id;
-    cmd += " OR right=";
-    cmd += node_id;
-
-    std::string res;
-    data_->exec( cmd,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    return res;
-  }
-
-  std::string ensure_node(int const value) const
-  {
-    auto const valueStr {std::to_string(value)};
-    std::string res;
-    auto cmd = std::string("INSERT INTO node (value, node_tree) VALUES(") + valueStr + ",";
-    cmd += tree_id_;
-    cmd += ") "
-      "ON CONFLICT(node_tree,value) DO NOTHING; SELECT id FROM node WHERE node_tree=";
-    cmd += tree_id_;
-    cmd += " AND value=" + valueStr;
-    data_->exec( cmd,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    return res;
+    int result;
+    visit_ancestors(repo, v2,
+                    [&ancestors, &result, &repo, this](auto id)
+                    {
+                      if (ancestors.find(id) != ancestors.end())
+                      {
+                        result = repo.get_value_by_id(id);
+                        return false;
+                      }
+                      return true;
+                    });
+    if (!found)
+      throw std::runtime_error("No common ancestor.");
+    return result;
   }
 
 private:
-  TData *data_;
-  std::string tree_id_;
+  TTreeKey tree_id_;
 };

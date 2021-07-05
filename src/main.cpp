@@ -4,6 +4,7 @@ extern "C"
 }
 #include <functional>
 #include "data-adapter.h"
+#include "tree.h"
 
 static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
 {
@@ -16,7 +17,7 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
         mg_http_reply(c, 200, nullptr, data.version().c_str());
       }
       else if (mg_http_match_uri(hm, "/tree")) {
-        auto tree_id = data.insert_tree({hm->body.ptr, hm->body.len});
+        auto tree_id = tree<std::string>::parse(data, {hm->body.ptr, hm->body.len}).id();
         mg_http_reply(c, 200, nullptr, tree_id.c_str());
       }
       else if (mg_http_match_uri(hm, "/tree/*/common-ancestor/*/*")) {
@@ -58,8 +59,8 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
         for (auto p {hm->uri.ptr}; p < end; ++p) {
           current(*p);
         }
-
-        mg_http_reply(c, 200, nullptr, std::to_string(data.find_common_ancestor(tree_id, value1, value2)).c_str());
+        tree t{tree_id};
+        mg_http_reply(c, 200, nullptr, std::to_string(t.find_common_ancestor(data, value1, value2)).c_str());
       }
       else {
         mg_http_reply(c, 404, nullptr, "Not found");
