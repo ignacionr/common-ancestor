@@ -19,9 +19,10 @@ public:
     return t;
   }
 
-  void visit_ancestors(auto &repo, int value, auto cb) const
+  template<typename TRepo>
+  void visit_ancestors(TRepo &repo, int value, auto cb) const
   {
-    for (auto ancestor = repo.get_id_by_value(tree_id_, value); !ancestor.empty(); ancestor = repo.get_parent_by_id(ancestor))
+    for (auto ancestor = repo.get_id_by_value(tree_id_, value); ancestor != typename TRepo::node_key_t(); ancestor = repo.get_parent_by_id(ancestor))
     {
       if (!cb(ancestor))
         break;
@@ -56,11 +57,12 @@ public:
     bool found{};
     int result;
     visit_ancestors(repo, v2,
-                    [&ancestors, &result, &repo, this](auto id)
+                    [&ancestors, &result, &repo, &found, this](auto id)
                     {
                       if (ancestors.find(id) != ancestors.end())
                       {
                         result = repo.get_value_by_id(id);
+                        found = true;
                         return false;
                       }
                       return true;

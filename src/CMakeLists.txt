@@ -38,6 +38,7 @@ enable_testing()
 add_executable(
   test-common-ancestor
   test/unit/tree-parser-test.cpp
+  test/unit/tree-test.cpp
 )
 
 target_link_libraries(

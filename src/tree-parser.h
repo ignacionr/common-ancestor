@@ -4,7 +4,6 @@
 #include <optional>
 #include <unordered_map>
 #include <stdexcept>
-#include <iostream>
 
 enum token_type
 {

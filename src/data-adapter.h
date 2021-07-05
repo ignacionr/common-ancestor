@@ -8,7 +8,6 @@
 #include <set>
 #include <functional>
 #include <numeric>
-#include <ranges>
 #include <memory>
 
 #include "version.h"
@@ -62,7 +61,7 @@ public:
       sqlite3_close(db);
   }
 
-  std::string get_parent_by_id(std::string_view node_id) const
+  node_key_t get_parent_by_id(node_key_t node_id) const
   {
     auto cmd = std::string("SELECT id FROM node WHERE ");
     cmd += " left=";
