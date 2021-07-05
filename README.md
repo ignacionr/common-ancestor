@@ -10,7 +10,7 @@ You will need **Docker, make** for a Docker build.
 make docker
 ```
 
-This will build and run a container, setup the code, compile, and run unit tests.
+This will build and run a container, setup the code, compile, and run unit tests. Finally, it will create a container with the built image, and run the program exposing port 8080.
 
 ## Try it
 

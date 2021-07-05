@@ -11,6 +11,8 @@
 #if !defined(VERSION)
 #define VERSION "please run CMake"
 #endif
+
+#include "tree.h"
 #include "tree-parser.h"
 
 class data_adapter
@@ -54,16 +56,20 @@ public:
 
   int find_common_ancestor(std::string_view tree_id, int v1, int v2) const
   {
+    tree<const data_adapter> tree(this,tree_id);
     std::set<std::string> ancestors;
-    for (auto ancestor1 = get_id_by_value(tree_id, v1); !ancestor1.empty(); ancestor1 = get_parent_by_id(ancestor1)) { 
-      ancestors.emplace(ancestor1);
-    }
-    for (auto ancestor2 {get_id_by_value(tree_id, v2)}; !ancestor2.empty(); ancestor2 = get_parent_by_id(ancestor2)) { 
-      if (ancestors.find(ancestor2) != ancestors.end()) {
-        return get_value_by_id(ancestor2);
+    tree.visit_ancestors(v1, [&ancestors](auto id){ ancestors.emplace(id); return true; });
+    bool found{};
+    int result;
+    tree.visit_ancestors(v2, [&ancestors, &result, &tree](auto id){ 
+      if (ancestors.find(id) != ancestors.end()) {
+        result = tree.get_value_by_id(id);
+        return false;
       }
-    }
-    throw std::runtime_error("No common ancestor.");
+      return true;
+    });
+    if (!found) throw std::runtime_error("No common ancestor.");
+    return result;
   }
 
   std::string insert_tree(std::string_view text) const
@@ -75,15 +81,16 @@ public:
     if (tree_id.empty()) {
       throw std::runtime_error("couldn't obtain last tree id");
     }
-    tree_parser::parse(text, [this, &tree_id](auto node){
-      auto this_node = ensure_node(tree_id, node.value);
+    tree<const data_adapter> tree{this,tree_id};
+    tree_parser::parse(text, [this, &tree](auto node){
+      auto this_node = tree.ensure_node(node.value);
       std::string additional;
       if (node.left.has_value()) {
-        auto left = ensure_node(tree_id, node.left.value());
+        auto left = tree.ensure_node(node.left.value());
         additional = " left = " + left;
       }
       if (node.right.has_value()) {
-        auto right = ensure_node(tree_id, node.right.value());
+        auto right = tree.ensure_node(node.right.value());
         if (!additional.empty()) additional += ',';
         additional += " right = " + right;
       }
@@ -106,8 +113,6 @@ public:
     }
     return result;
   }
-
-private:
 
   static std::string quoted(std::string_view text) 
   {
@@ -229,73 +234,6 @@ private:
       sqlite3_free(pError);
   }
 
-  std::string ensure_node(std::string_view tree_id, int const value) const
-  {
-    auto const valueStr {std::to_string(value)};
-    std::string res;
-    auto cmd = std::string("INSERT INTO node (value, node_tree) VALUES(") + valueStr + ",";
-    cmd += tree_id;
-    cmd += ") "
-      "ON CONFLICT(node_tree,value) DO NOTHING; SELECT id FROM node WHERE node_tree=";
-    cmd += tree_id;
-    cmd += " AND value=" + valueStr;
-    exec( cmd,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    return res;
-  }
-
-  std::string get_parent_by_id(std::string_view node_id) const 
-  {
-    auto cmd = std::string("SELECT id FROM node WHERE ");
-    cmd += " left=";
-    cmd += node_id;
-    cmd += " OR right=";
-    cmd += node_id;
-
-    std::string res;
-    exec( cmd,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    return res;
-  }
-
-  std::string get_id_by_value(std::string_view tree_id, int const value) const
-  {
-    auto const valueStr {std::to_string(value)};
-    auto cmd = std::string("SELECT id FROM node WHERE node_tree = ");
-    cmd += tree_id;
-    cmd += " AND value=";
-    cmd += std::to_string(value);
-    std::string res;
-    exec( cmd,
-      [&res](auto values, auto columns) {
-        res = values.front();
-      });
-    if (res.empty()) {
-      throw std::runtime_error("Not found.");
-    }
-    return res;
-  }
-
-  int get_value_by_id(std::string_view node_id) const
-  {
-    auto cmd = std::string("SELECT value FROM node WHERE id = ");
-    cmd += node_id;
-    int res;
-    bool found{};
-    exec( cmd,
-      [&res, &found](auto values, auto columns) {
-        res = std::atoi(std::string(values.front()).c_str());
-        found = true;
-      });
-    if (!found) {
-      throw std::runtime_error("Not found.");
-    }
-    return res;
-  }
-
+private:
   sqlite3 *db{};
 };
