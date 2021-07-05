@@ -15,6 +15,9 @@ TEST(tree_parser, invalid_text) {
   EXPECT_THROW(tree_parser::parse("[1>2>3]", [](auto){ }), std::runtime_error);
   EXPECT_THROW(tree_parser::parse("[1<2>3][]", [](auto){ }), std::runtime_error);
   EXPECT_THROW(tree_parser::parse("[][1<2>3]", [](auto){ }), std::runtime_error);
+  EXPECT_THROW(tree_parser::parse("[2<2>3]", [](auto){ }), std::runtime_error);
+  EXPECT_THROW(tree_parser::parse("[2<3>3]", [](auto){ }), std::runtime_error);
+  EXPECT_THROW(tree_parser::parse("[10<8>9]", [](auto){ }), std::runtime_error);
 }
 
 TEST(tree_parser, valid_text_1) {

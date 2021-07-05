@@ -162,6 +162,12 @@ public:
       status = mechanism.at(status).at(t.t)(t, res);
       if (status == emit)
       {
+        if (res.left.has_value() && res.left.value() >= res.value) {
+          throw std::runtime_error("The left node must have a lesser value.");
+        }
+        if (res.right.has_value() && res.right.value() <= res.value) {
+          throw std::runtime_error("The right node must have a greater value.");
+        }
         callback(res);
         status = initial;
       }
