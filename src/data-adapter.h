@@ -12,7 +12,7 @@
 
 #include "version.h"
 #if !defined(VERSION)
-#define VERSION "please run CMake"
+#define VERSION "test"
 #endif
 
 #include "tree.h"
@@ -21,6 +21,8 @@ class data_adapter
 {
 public:
   using node_key_t = std::string;
+  using tree_key_t = std::string;
+
   data_adapter()
   {
     auto rc{sqlite3_open("trees-" VERSION ".db", &db)};
@@ -156,18 +158,18 @@ public:
   void bind_left(std::string_view node, std::string_view left) const
   {
     std::string cmd("UPDATE node SET left = ");
-    cmd += node;
-    cmd += " WHERE id = ";
     cmd += left;
+    cmd += " WHERE id = ";
+    cmd += node;
     exec(cmd);
   }
 
   void bind_right(std::string_view node, std::string_view right) const
   {
     std::string cmd("UPDATE node SET right = ");
-    cmd += node;
-    cmd += " WHERE id = ";
     cmd += right;
+    cmd += " WHERE id = ";
+    cmd += node;
     exec(cmd);
   }
 

@@ -35,15 +35,21 @@ target_include_directories(common-ancestor
 
 enable_testing()
 
-add_executable(
-  test-common-ancestor
+add_executable(test-common-ancestor
   test/unit/tree-parser-test.cpp
   test/unit/tree-test.cpp
+  test/unit/mini-parser-test.cpp
+  test/unit/data-adapter-test.cpp
+  ${mongoose_SOURCE_DIR}/mongoose.c 
 )
+
+target_include_directories(test-common-ancestor
+  PUBLIC ${PROJECT_BINARY_DIR} )
 
 target_link_libraries(
   test-common-ancestor
   gtest_main
+  sqlite3
 )
 
 include(GoogleTest)
