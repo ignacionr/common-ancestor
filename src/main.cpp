@@ -3,70 +3,44 @@ extern "C"
 #include <mongoose.h>
 }
 #include <functional>
+#include <unordered_map>
 #include "data-adapter.h"
 #include "tree.h"
+#include "tree-controller.h"
+#include "abstract_protocol.h"
+
+using controller_map_t = std::unordered_map<std::string, std::function<void(abstract_protocol &)>>;
 
 static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
 {
-  static data_adapter data;
   if (ev == MG_EV_HTTP_MSG)
   {
-    try {
-    auto hm{(struct mg_http_message *)ev_data};
-      if (mg_http_match_uri(hm, "/version")) {
-        mg_http_reply(c, 200, nullptr, data.version().c_str());
-      }
-      else if (mg_http_match_uri(hm, "/tree")) {
-        auto tree_id = tree<std::string>::parse(data, {hm->body.ptr, hm->body.len}).id();
-        mg_http_reply(c, 200, nullptr, tree_id.c_str());
-      }
-      else if (mg_http_match_uri(hm, "/tree/*/common-ancestor/*/*")) {
-        std::string tree_id;
-        int value1{}, value2{};
-        auto end = hm->uri.ptr + hm->uri.len;
-        using parser = std::function<void(char)>;
-        parser current;
-        auto parse_throw = [](char){ throw "parse error"; };
-        auto ignore = [&current](size_t count, parser next) {
-          return [count, &current, next](char c) mutable {
-            if (c == '/' && --count == 0) {
-              current = next;
-            }
-          };
-        };
-        auto read = [&current](std::string &s, parser next) {
-          return [&current, next, &s](char c) {
-            if (c == '/') {
-              current = next;
-            }
-            else {
-              s += c;
-            }
-          };
-        };
-        auto read_int = [&current](int &s, parser next) {
-          return [&current, &s, next](char c) {
-            if (isdigit(c)) {
-              s *= 10;
-              s += c - '0';
-            }
-            else {
-              current = next;
-            }
-          };
-        };
-        current = ignore(2, read(tree_id, ignore(1, read_int(value1, read_int(value2, parse_throw)))));
-        for (auto p {hm->uri.ptr}; p < end; ++p) {
-          current(*p);
-        }
-        tree t{tree_id};
-        mg_http_reply(c, 200, nullptr, std::to_string(t.find_common_ancestor(data, value1, value2)).c_str());
+    try
+    {
+      auto hm{(struct mg_http_message *)ev_data};
+      auto cm{reinterpret_cast<controller_map_t const *>(fn_data)};
+      abstract_protocol proto {
+          {hm->uri.ptr, hm->uri.len},
+          {hm->body.ptr, hm->body.len},
+          [&c](std::string_view contents)
+          {
+            mg_http_reply(c, 200, nullptr, std::string(contents).c_str());
+          }};
+      auto pos = std::find_if(cm->begin(), cm->end(), [hm](auto const &entry) {
+        return mg_http_match_uri(hm, entry.first.c_str());
+      });
+      if (pos != cm->end()) {
+        pos->second(proto);
       }
       else {
-        mg_http_reply(c, 404, nullptr, "Not found");
+        static mg_http_serve_opts opts {
+          "html", nullptr, nullptr
+        };
+        mg_http_serve_dir(c, hm, &opts);
       }
     }
-    catch(std::exception const &e) {
+    catch (std::exception const &e)
+    {
       mg_http_reply(c, 500, nullptr, e.what());
     }
   }
@@ -74,10 +48,18 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
 
 int main()
 {
+  data_adapter data;
+  tree_controller tc{data};
+  controller_map_t map {
+    {"/tree/*/common-ancestor/*/*", [&tc](auto &proto){tc.common_ancestor(proto);}},
+    {"/tree", [&tc](auto &proto){ tc.post_tree(proto); }},
+    {"/version", [](auto &proto) { proto.reply(VERSION);}},
+  };
+
   struct mg_mgr mgr;
   struct mg_connection *c;
   mg_mgr_init(&mgr);
-  if ((c = mg_http_listen(&mgr, "http://0.0.0.0:8080", route, nullptr)) == nullptr)
+  if ((c = mg_http_listen(&mgr, "http://0.0.0.0:8080", route, &map)) == nullptr)
   {
     exit(EXIT_FAILURE);
   }

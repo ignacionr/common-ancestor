@@ -15,12 +15,13 @@ run: build/common-ancestor
 	cd build && ./common-ancestor
 
 bg: build/common-ancestor
-	cd build && ./common-ancestor &
+	build/common-ancestor &
+	sleep 3
 
 kill: 
 	pkill common-ancestor
 
-test-integration: bg post-tree.pass retrieve-common-ancestor.pass kill
+test-integration: bg post-tree.pass retrieve-common-ancestor.pass index-page.pass kill
 
 %.pass: src/test/integration/%.sh
 	$<

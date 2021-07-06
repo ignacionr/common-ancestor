@@ -1,13 +1,13 @@
 #pragma once
 #include "tree-parser.h"
 
-template <typename TTreeKey>
+template <typename tree_key_t>
 class tree
 {
 public:
-  tree(TTreeKey tree_id) : tree_id_{tree_id} {}
+  tree(tree_key_t tree_id) : tree_id_{tree_id} {}
 
-  TTreeKey id() const { return tree_id_; }
+  tree_key_t id() const { return tree_id_; }
 
   static tree parse(auto &repo, std::string_view text)
   {
@@ -19,10 +19,10 @@ public:
     return t;
   }
 
-  template<typename TRepo>
-  void visit_ancestors(TRepo &repo, int value, auto cb) const
+  template<typename repo_t>
+  void visit_ancestors(repo_t &repo, int value, auto cb) const
   {
-    for (auto ancestor = repo.get_id_by_value(tree_id_, value); ancestor != typename TRepo::node_key_t(); ancestor = repo.get_parent_by_id(ancestor))
+    for (auto ancestor = repo.get_id_by_value(tree_id_, value); ancestor != typename repo_t::node_key_t(); ancestor = repo.get_parent_by_id(ancestor))
     {
       if (!cb(ancestor))
         break;
@@ -44,10 +44,10 @@ public:
     }
   }
 
-  template <typename TRepo>
-  int find_common_ancestor(TRepo &repo, int v1, int v2) const
+  template <typename repo_t>
+  int find_common_ancestor(repo_t &repo, int v1, int v2) const
   {
-    std::set<typename TRepo::node_key_t> ancestors;
+    std::set<typename repo_t::node_key_t> ancestors;
     visit_ancestors(repo, v1,
                     [&ancestors](auto id)
                     {
@@ -73,5 +73,5 @@ public:
   }
 
 private:
-  TTreeKey tree_id_;
+  tree_key_t tree_id_;
 };
