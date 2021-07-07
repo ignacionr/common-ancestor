@@ -1,0 +1,28 @@
+version: "3.3"
+services:
+  t1:
+    build:
+      context: .
+      args:
+        - appargument=-b
+    environment: 
+      - TREEHOST=t1
+  t2:
+    build:
+      context: .
+      args:
+        - appargument=-b
+    environment: 
+      - TREEHOST=t2
+  t3:
+    build:
+      context: .
+      args:
+        - appargument=-b
+    environment: 
+      - TREEHOST=t3
+  balancer:
+    build:
+      context: balancer
+    ports:
+      - "8080:8080"
