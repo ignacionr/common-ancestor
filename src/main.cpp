@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     prefix = std::getenv("TREEHOST");
     prefix += '-';
   }
-  tree_controller tc{data, prefix};
+  tree_controller tc{data, {[prefix](std::string const &id){return prefix + id; }, [](auto id){ return id; }}};
   controller_map_t map {
     {"/tree/*/common-ancestor/*/*", [&tc](auto &proto){tc.common_ancestor(proto);}},
     {"/tree", [&tc](auto &proto){ tc.post_tree(proto); }},

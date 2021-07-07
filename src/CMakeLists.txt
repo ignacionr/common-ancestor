@@ -38,6 +38,7 @@ enable_testing()
 add_executable(test-common-ancestor
   test/unit/tree-parser-test.cpp
   test/unit/tree-test.cpp
+  test/unit/tree-controller-test.cpp
   test/unit/mini-parser-test.cpp
   test/unit/data-adapter-test.cpp
   ${mongoose_SOURCE_DIR}/mongoose.c 
