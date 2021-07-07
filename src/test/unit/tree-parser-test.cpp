@@ -17,7 +17,9 @@ TEST(tree_parser, invalid_text) {
   EXPECT_THROW(tree_parser::parse("[][1<2>3]", [](auto){ }), std::runtime_error);
   EXPECT_THROW(tree_parser::parse("[2<2>3]", [](auto){ }), std::runtime_error);
   EXPECT_THROW(tree_parser::parse("[2<3>3]", [](auto){ }), std::runtime_error);
-  EXPECT_THROW(tree_parser::parse("[10<8>9]", [](auto){ }), std::runtime_error);
+  EXPECT_THROW(tree_parser::parse("[10<8>10]", [](auto){ }), std::runtime_error);
+  EXPECT_THROW(tree_parser::parse("[8<8>10]", [](auto){ }), std::runtime_error);
+  EXPECT_THROW(tree_parser::parse("[10<8>8]", [](auto){ }), std::runtime_error);
 }
 
 TEST(tree_parser, valid_text_1) {
@@ -45,6 +47,24 @@ TEST(tree_parser, valid_text_2) {
   };
   tree_parser::triplet const *current {expected};
   tree_parser::parse("[5<10>15][<10>][5>7][13<15][11<13>14]", [&current](auto value) {
+    EXPECT_EQ(value.left, current->left);
+    EXPECT_EQ(value.value, current->value);
+    EXPECT_EQ(value.right, current->right);
+    ++current;
+  });
+  EXPECT_EQ(current, expected + sizeof(expected)/ sizeof(*expected));
+}
+
+TEST(tree_parser, from_test) {
+  tree_parser::triplet const expected[] = {
+    {2, 1, 8},
+    {4, 2, 3},
+    {{}, 4, 5},
+    {9, 8, 10},
+    {11, 10, 12}
+  };
+  tree_parser::triplet const *current {expected};
+  tree_parser::parse("[2<1>8][4<2>3][4>5][9<8>10][11<10>12]", [&current](auto value) {
     EXPECT_EQ(value.left, current->left);
     EXPECT_EQ(value.value, current->value);
     EXPECT_EQ(value.right, current->right);
