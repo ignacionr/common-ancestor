@@ -4,6 +4,9 @@ extern "C"
 }
 #include <functional>
 #include <unordered_map>
+#include <cstring>
+#include <cstdlib>
+#include <unistd.h>
 #include "data-adapter.h"
 #include "tree.h"
 #include "tree-controller.h"
@@ -46,10 +49,20 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
   }
 }
 
-int main()
+int main(int argc, char **argv)
 {
   data_adapter data;
-  tree_controller tc{data};
+  auto using_balancer = 
+    std::any_of(argv + 1, argv + argc, [](char *text){ return 0 == std::strncmp("--balancer", text, 11);}) ||
+    std::any_of(argv + 1, argv + argc, [](char *text){ return 0 == std::strncmp("-b", text, 3);});
+  std::string prefix;
+  if (using_balancer) {
+    char buff [64];
+    gethostname(buff, 64);
+    prefix = buff;
+    prefix += '-';
+  }
+  tree_controller tc{data, prefix};
   controller_map_t map {
     {"/tree/*/common-ancestor/*/*", [&tc](auto &proto){tc.common_ancestor(proto);}},
     {"/tree", [&tc](auto &proto){ tc.post_tree(proto); }},

@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <string_view>
 #include "abstract_protocol.h"
 #include "tree.h"
 #include "mini-parser.h"
@@ -8,7 +9,10 @@
 template <typename repo_t>
 struct tree_controller
 {
-  tree_controller(repo_t &data) : data_{data} {}
+  tree_controller(repo_t &data, std::string_view tree_prefix) 
+  : data_{data}, tree_prefix_{tree_prefix} 
+  {
+  }
 
   void common_ancestor(abstract_protocol &proto)
   {
@@ -24,12 +28,14 @@ struct tree_controller
     auto result {t.find_common_ancestor(data_, value1, value2)};
     proto.reply(std::to_string(result));
   }
+
   void post_tree(abstract_protocol &proto)
   {
     auto tree_id = tree<std::string>::parse(data_, proto.body).id();
-    proto.reply(tree_id);
+    proto.reply(tree_prefix_ + tree_id);
   }
 
 private:
   repo_t &data_;
+  std::string tree_prefix_;
 };
