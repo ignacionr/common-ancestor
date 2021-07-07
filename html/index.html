@@ -5,7 +5,42 @@
 </head>
 
 <body>
-  <h1>Hello world!</h1>
+  <h1>Common Ancestor</h1>
+  <h2>Create a tree</h2>
+  Enter a tree: 
+  <input type="text" id="tree-text" value="[10&lt;20>30][5&lt;10>13][25&lt;30>35]" />
+  <button onclick="do_create()">Create</button>
+  <div id='create-result'></div>
+  <h2>Query Common Ancestors</h2>
+  <label>v1: <input type="number" id='v1' value="5"></label>
+  <label>v2: <input type="number" id='v2' value="20"></label>
+  <button onclick="do_query()">Query</button>
+  <div id="common-ancestor-result"></div>
+  <script type="text/javascript">
+    let tree_id;
+
+    function do_create() {
+      const tree = window.document.getElementById("tree-text").value;
+      fetch('/tree', {
+        method: "POST",
+        body: tree
+      })
+      .catch(reason => alert(reason))
+      .then(resp => resp.text().then(resp => {
+        tree_id = resp;
+        window.document.getElementById("create-result").innerText = `tree id: ${resp}`;
+      }));
+    }
+
+    function do_query() {
+      const v1 = window.document.getElementById("v1").value;
+      const v2 = window.document.getElementById("v2").value;
+      fetch(`/tree/${tree_id}/common-ancestor/${v1}/${v2}`)
+      .catch(reason => alert(reason))
+      .then(resp => resp.text().then(resp => 
+        window.document.getElementById("common-ancestor-result").innerText = `the answer is: ${resp}`));
+    }
+  </script>
 </body>
 
 </html>
