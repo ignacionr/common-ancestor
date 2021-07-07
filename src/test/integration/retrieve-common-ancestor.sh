@@ -5,7 +5,7 @@ echo tree: $TREE
 ANCESTOR=`curl http://localhost:8080/tree/$TREE/common-ancestor/11/14 -s`
 echo ancestor: $ANCESTOR
 
-if [$ANCESTOR = 13]
+if [ "$ANCESTOR" = "13" ]
 then
   echo OK
 else
