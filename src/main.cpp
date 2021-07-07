@@ -52,14 +52,10 @@ static void route(struct mg_connection *c, int ev, void *ev_data, void *fn_data)
 int main(int argc, char **argv)
 {
   data_adapter data;
-  auto using_balancer = 
-    std::any_of(argv + 1, argv + argc, [](char *text){ return 0 == std::strncmp("--balancer", text, 11);}) ||
-    std::any_of(argv + 1, argv + argc, [](char *text){ return 0 == std::strncmp("-b", text, 3);});
+  auto using_balancer = argc > 1;
   std::string prefix;
   if (using_balancer) {
-    char buff [64];
-    gethostname(buff, 64);
-    prefix = buff;
+    prefix = std::getenv("TREEHOST");
     prefix += '-';
   }
   tree_controller tc{data, prefix};

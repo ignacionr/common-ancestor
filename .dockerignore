@@ -3,3 +3,7 @@ README.md
 Dockerfile
 .git
 .gitignore
+build
+**/build
+balancer
+docker-compose.yml
