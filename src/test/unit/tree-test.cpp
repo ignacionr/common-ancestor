@@ -44,3 +44,18 @@ TEST(tree, simple_negative)
   the_tree.add_node(adapter, triplet{115, 110, 120});
   EXPECT_THROW(the_tree.find_common_ancestor(adapter, 10, 120), std::runtime_error);
 }
+
+TEST(tree, from_test)
+{
+  mem_adapter adapter;
+  auto tree_id{adapter.new_tree()};
+  tree the_tree{tree_id};
+  the_tree.add_node(adapter, triplet{1, 2, 8});
+  the_tree.add_node(adapter, triplet{2, 4, 3});
+  the_tree.add_node(adapter, triplet{4, {}, 5});
+  the_tree.add_node(adapter, triplet{8, 9, 10});
+  the_tree.add_node(adapter, triplet{10, 11, 12});
+  ASSERT_EQ(2, the_tree.find_common_ancestor(adapter, 5, 3));
+  ASSERT_EQ(1, the_tree.find_common_ancestor(adapter, 3, 10));
+  ASSERT_EQ(10, the_tree.find_common_ancestor(adapter, 11, 12));
+}
