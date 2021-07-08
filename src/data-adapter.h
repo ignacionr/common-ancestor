@@ -50,12 +50,12 @@ public:
                                "FOREIGN KEY(left) REFERENCES node(id)",
                                "FOREIGN KEY(right) REFERENCES node(id)",
                                "UNIQUE (node_tree,value)"});
-      upsert("config", "item", "content", "version", VERSION);
+      upsert_string("config", "item", "content", "version", VERSION);
     }
   }
 
-  data_adapter(const data_adapter&) = delete;
-  data_adapter(data_adapter&&) = delete;
+  data_adapter(const data_adapter &) = delete;
+  data_adapter(data_adapter &&) = delete;
 
   ~data_adapter()
   {
@@ -65,18 +65,14 @@ public:
 
   node_key_t get_parent_by_id(node_key_t node_id) const
   {
-    auto cmd = std::string("SELECT id FROM node WHERE ");
-    cmd += " left=";
-    cmd += node_id;
-    cmd += " OR right=";
-    cmd += node_id;
-
+    string_parameter node_id_param {std::string(node_id)};
     std::string res;
-    exec(cmd,
+    exec("SELECT id FROM node WHERE left=? OR right=?1",
          [&res](auto values, auto columns)
          {
            res = values.front();
-         });
+         },
+         { &node_id_param });
     return res;
   }
 
@@ -85,9 +81,7 @@ public:
     std::string tree_id;
     exec("INSERT INTO tree DEFAULT VALUES");
     exec("SELECT last_insert_rowid()", [&tree_id](auto values, auto columns)
-         {
-           tree_id = values.front();
-         });
+         { tree_id = values.front(); });
     if (tree_id.empty())
     {
       throw std::runtime_error("couldn't obtain last tree id");
@@ -99,35 +93,35 @@ public:
   {
     auto const valueStr{std::to_string(value)};
     std::string res;
-    auto cmd = std::string("INSERT INTO node (value, node_tree) VALUES(") + valueStr + ",";
-    cmd += tree_id;
-    cmd += ") "
-           "ON CONFLICT(node_tree,value) DO NOTHING";
-    exec(cmd);
 
-    cmd = "SELECT id FROM node WHERE node_tree=";
-    cmd += tree_id;
-    cmd += " AND value=" + valueStr;
-    exec(cmd,
+    string_parameter tree_id_param{std::string(tree_id)};
+    int_parameter value_param{value};
+
+    exec(
+        "INSERT INTO node (node_tree,value) VALUES(?,?) ON CONFLICT(node_tree,value) DO NOTHING",
+        {&tree_id_param, &value_param});
+
+    exec("SELECT id FROM node WHERE node_tree=? AND value=?",
          [&res](auto values, auto columns)
          {
            res = values.front();
-         });
+         },
+         {&tree_id_param, &value_param});
     return res;
   }
 
   int get_value_by_id(std::string_view node_id) const
   {
-    auto cmd = std::string("SELECT value FROM node WHERE id = ");
-    cmd += node_id;
     int res;
+    string_parameter node_id_param {std::string(node_id)};
     bool found{};
-    exec(cmd,
+    exec("SELECT value FROM node WHERE id = ?",
          [&res, &found](auto values, auto columns)
          {
            res = std::atoi(std::string(values.front()).c_str());
            found = true;
-         });
+         },
+         { & node_id_param });
     if (!found)
     {
       throw std::runtime_error("Not found.");
@@ -137,17 +131,15 @@ public:
 
   std::string get_id_by_value(std::string const &tree_id, int const value) const
   {
-    auto const valueStr{std::to_string(value)};
-    auto cmd = std::string("SELECT id FROM node WHERE node_tree = ");
-    cmd += tree_id;
-    cmd += " AND value=";
-    cmd += std::to_string(value);
+    string_parameter tree_id_param {std::string{tree_id}};
+    int_parameter value_param {value};
     std::string res;
-    exec(cmd,
+    exec("SELECT id FROM node WHERE node_tree = ? AND value=?",
          [&res](auto values, auto columns)
          {
            res = values.front();
-         });
+         },
+         { &tree_id_param, &value_param});
     if (res.empty())
     {
       throw std::runtime_error("Not found.");
@@ -157,20 +149,16 @@ public:
 
   void bind_left(std::string_view node, std::string_view left) const
   {
-    std::string cmd("UPDATE node SET left = ");
-    cmd += left;
-    cmd += " WHERE id = ";
-    cmd += node;
-    exec(cmd);
+    string_parameter node_param{std::string(node)};
+    string_parameter left_param{std::string(left)};
+    exec("UPDATE node SET left = ? WHERE id = ?", {&left_param, &node_param});
   }
 
   void bind_right(std::string_view node, std::string_view right) const
   {
-    std::string cmd("UPDATE node SET right = ");
-    cmd += right;
-    cmd += " WHERE id = ";
-    cmd += node;
-    exec(cmd);
+    string_parameter node_param{std::string(node)};
+    string_parameter right_param{std::string(right)};
+    exec("UPDATE node SET right = ? WHERE id = ?", {&right_param, &node_param});
   }
 
   std::string version() const
@@ -189,23 +177,6 @@ public:
   }
 
 private:
-  static std::string quoted(std::string_view text)
-  {
-    std::string result;
-    result.reserve(text.size() + 2);
-    result.append("'");
-    for (auto c : text)
-    {
-      if (c == '\'')
-      {
-        result += '\'';
-      }
-      result += c;
-    }
-    result += '\'';
-    return result;
-  }
-
   template <typename T>
   void create_table(std::string_view name, T fields, bool if_not_exists = false) const
   {
@@ -236,54 +207,19 @@ private:
     exec(cmd);
   }
 
-  void upsert(std::string_view table,
-              std::string_view key_column,
-              std::string_view value_column,
-              std::string_view key,
-              std::string_view new_value) const
+  void upsert_string(std::string_view table,
+                     std::string_view key_column,
+                     std::string_view value_column,
+                     std::string_view key,
+                     std::string_view new_value) const
   {
-    std::string cmd("INSERT INTO ");
-    cmd += table;
-    cmd += '(';
-    cmd += key_column;
-    cmd += ',';
-    cmd += value_column;
-    cmd += ") VALUES (";
-    cmd += quoted(key);
-    cmd += ',';
-    cmd += quoted(new_value);
-    cmd += ") ON CONFLICT(";
-    cmd += key_column;
-    cmd += ") DO UPDATE SET ";
-    cmd += value_column;
-    cmd += "=excluded.";
-    cmd += value_column;
-    exec(cmd);
-  }
-
-  void exec(std::string_view command) const
-  {
-    char *pError{};
-    // prepare
-    sqlite3_stmt *stmt{};
-    auto rc = sqlite3_prepare_v2(db, command.data(), command.length(), &stmt, nullptr);
-    check_rc(rc, command);
-    {
-      stmt_hold hs{stmt};
-      // step
-      do
-      {
-        rc = sqlite3_step(hs);
-        if (rc == SQLITE_ROW)
-        {
-          // uninteded query?
-        }
-        else if (rc != SQLITE_DONE)
-        {
-          check_rc(rc, command);
-        }
-      } while (rc != SQLITE_DONE);
-    }
+    string_parameter table_parameter{std::string(table)};
+    string_parameter key_column_parameter{std::string(key_column)};
+    string_parameter value_column_parameter{std::string(value_column)};
+    string_parameter key_parameter{std::string(key)};
+    string_parameter new_value_parameter{std::string(new_value)};
+    exec("INSET INTO ? (?,?) VALUES (?,?) ON CONFLICT(?2) DO UPDATE SET ?3=excluded.?3",
+         {&table_parameter, &key_column_parameter, &value_column_parameter, &key_parameter, &new_value_parameter});
   }
 
   void check_rc(int rc, std::string_view context, char *pError = nullptr) const
@@ -312,7 +248,7 @@ private:
       // finalize
       sqlite3_finalize(held_);
     }
-    operator sqlite3_stmt*()
+    operator sqlite3_stmt *()
     {
       return held_;
     }
@@ -321,16 +257,25 @@ private:
     sqlite3_stmt *held_;
   };
 
-  template <typename T>
-  void exec(std::string_view command, T callback) const
+  struct parameter
   {
-    char *pError{};
+    virtual ~parameter() = default;
+    virtual void bind(sqlite3_stmt *, int index) const = 0;
+  };
+
+  template <typename T>
+  void exec(std::string_view command, T callback, std::vector<parameter *> parameters = {}) const
+  {
     // prepare
     sqlite3_stmt *stmt;
     auto rc = sqlite3_prepare_v2(db, command.data(), command.length(), &stmt, nullptr);
     check_rc(rc, command);
     {
       stmt_hold hs{stmt};
+      for (int idx{}; idx < parameters.size(); ++idx)
+      {
+        parameters[idx]->bind(hs, idx + 1);
+      }
       size_t const col_count{static_cast<size_t>(sqlite3_column_count(stmt))};
       std::vector<std::string_view> col_names{col_count};
       for (int c{0}; c < col_count; ++c)
@@ -358,5 +303,58 @@ private:
     }
   }
 
+  struct int_parameter : public parameter
+  {
+    int value;
+    int_parameter(int v) : value{v} {}
+    void bind(sqlite3_stmt *stmt, int index) const override
+    {
+      auto rc = sqlite3_bind_int(stmt, index, value);
+      if (rc != SQLITE_OK)
+      {
+        throw std::runtime_error("error " + std::to_string(rc) + " index " + std::to_string(index));
+      }
+    }
+  };
+
+  struct string_parameter : public parameter
+  {
+    std::string value;
+    string_parameter(std::string const &v) : value{v} {}
+    void bind(sqlite3_stmt *stmt, int index) const override
+    {
+      auto rc = sqlite3_bind_text(stmt, index, value.data(), value.size(), SQLITE_STATIC);
+      if (rc != SQLITE_OK)
+      {
+        throw std::runtime_error("error " + std::to_string(rc) + " index " + std::to_string(index));
+      }
+    }
+  };
+
+  void exec(std::string_view command, std::vector<parameter *> parameters = {}) const
+  {
+    // prepare
+    sqlite3_stmt *stmt;
+    auto rc = sqlite3_prepare_v2(db, command.data(), command.length(), &stmt, nullptr);
+    check_rc(rc, command);
+    {
+      stmt_hold hs{stmt};
+      for (int idx{}; idx < parameters.size(); ++idx)
+      {
+        parameters[idx]->bind(hs, idx + 1);
+      }
+      // step
+      do
+      {
+        rc = sqlite3_step(hs);
+        if (rc != SQLITE_DONE)
+        {
+          check_rc(rc, command);
+        }
+      } while (rc != SQLITE_DONE);
+    }
+  }
+
+private:
   sqlite3 *db{};
 };
